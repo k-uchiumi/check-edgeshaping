@@ -247,9 +247,17 @@
     submitBtn.disabled = false;
   }
 
-  function poll(diagnosisId) {
+  // 項目1-c: Workflow起動直後は進捗レコードの書き込みより先に画面が問い合わせて
+  // 404になることがある。診断開始から30秒以内の404は「開始待ち」として再試行する。
+  function poll(diagnosisId, startTime) {
+    if (startTime === undefined) startTime = Date.now();
     fetch('/api/diagnose/' + diagnosisId + '/public')
       .then(function (res) {
+        if (res.status === 404) {
+          var notFoundErr = new Error('not_found');
+          notFoundErr.isNotFound = true;
+          throw notFoundErr;
+        }
         if (!res.ok) throw new Error('取得に失敗しました');
         return res.json();
       })
@@ -260,7 +268,7 @@
           const total = view.progress ? view.progress.total : 0;
           statusText.textContent = '診断中… (' + done + ' / ' + total + ')';
           progressBarInner.style.width = (total ? Math.round((done / total) * 100) : 0) + '%';
-          pollTimer = setTimeout(function () { poll(diagnosisId); }, 2000);
+          pollTimer = setTimeout(function () { poll(diagnosisId, startTime); }, 2000);
           return;
         }
         if (view.status === 'site_not_found') {
@@ -278,7 +286,13 @@
           return;
         }
       })
-      .catch(function () {
+      .catch(function (err) {
+        if (err && err.isNotFound && (Date.now() - startTime) < 30000) {
+          statusBox.style.display = 'block';
+          statusText.textContent = '診断を開始しています…';
+          pollTimer = setTimeout(function () { poll(diagnosisId, startTime); }, 2000);
+          return;
+        }
         showError('診断状況の取得に失敗しました。時間をおいて再度お試しください。');
         submitBtn.disabled = false;
       });

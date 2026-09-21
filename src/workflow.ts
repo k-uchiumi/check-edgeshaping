@@ -40,11 +40,21 @@ export interface ProgressRecord {
   errorMessage?: string;
 }
 
-const TOTAL_STEPS = 1 + BOT_DICTIONARY.length + 1; // 70
+export const TOTAL_STEPS = 1 + BOT_DICTIONARY.length + 1; // 70
+export const PROGRESS_TTL_SECONDS = 60 * 60 * 6; // 6時間で失効（問い合わせ添付用の永続化は実装順序5でSheetsへ）
 
 async function writeProgress(env: Env, record: ProgressRecord) {
   await env.CHECK_PROGRESS.put(`diag:${record.diagnosisId}`, JSON.stringify(record), {
-    expirationTtl: 60 * 60 * 6, // 6時間で失効（問い合わせ添付用の永続化は実装順序5でSheetsへ）
+    expirationTtl: PROGRESS_TTL_SECONDS,
+  });
+}
+
+// 項目2: 進捗の書き込みは必ずstep.do経由にする。Workflowsはstep.sleepからの再開時に
+// run()を先頭から再実行するため、step外の処理は毎回やり直される。step名は再実行しても
+// 変わらない一意な名前にすること。
+async function persistProgress(env: Env, step: WorkflowStep, name: string, record: ProgressRecord): Promise<void> {
+  await step.do(name, async () => {
+    await writeProgress(env, record);
   });
 }
 
@@ -53,6 +63,7 @@ export class CheckWorkflow extends WorkflowEntrypoint<Env, CheckWorkflowParams> 
     const { targetUrl, diagnosisId } = event.payload;
     const hostValidator = createHostValidator();
 
+    // 初期の進捗レコードは POST /api/diagnose 側（index.ts）で書き込み済み（項目1-a）。
     let progress: ProgressRecord = {
       status: 'running',
       diagnosisId,
@@ -62,7 +73,6 @@ export class CheckWorkflow extends WorkflowEntrypoint<Env, CheckWorkflowParams> 
       startedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    await writeProgress(this.env, progress);
 
     // ① 存在確認（1回、通常のブラウザUA）
     const existence = await step.do('existence-check', async () => {
@@ -89,10 +99,10 @@ export class CheckWorkflow extends WorkflowEntrypoint<Env, CheckWorkflowParams> 
     // ② 2xx以外 → 診断に入らず終了（A6）
     if (!progress.existenceCheck!.ok) {
       progress.status = 'site_not_found';
-      await writeProgress(this.env, progress);
+      await persistProgress(this.env, step, 'progress-existence', progress);
       return progress;
     }
-    await writeProgress(this.env, progress);
+    await persistProgress(this.env, step, 'progress-existence', progress);
 
     // ③ 本診断（68件、直列、1秒間隔）— A1〜A4, A7
     const results: ProbeResult[] = [];
@@ -118,7 +128,7 @@ export class CheckWorkflow extends WorkflowEntrypoint<Env, CheckWorkflowParams> 
         done: 2 + i,
         updatedAt: new Date().toISOString(),
       };
-      await writeProgress(this.env, progress);
+      await persistProgress(this.env, step, `progress-probe-${i}`, progress);
     }
 
     // ④ robots.txt を1回取得し、各ボットへのDisallowを解析（実装順序3）
@@ -156,7 +166,7 @@ export class CheckWorkflow extends WorkflowEntrypoint<Env, CheckWorkflowParams> 
       robotsTxt: robotsSummary,
       results: finalResults,
     };
-    await writeProgress(this.env, progress);
+    await persistProgress(this.env, step, 'progress-complete', progress);
 
     // ⑤ Google Sheetsへの保存（実装順序5。§4.5「ドメイン×日付で蓄積」「問い合わせ添付用データ」）
     // 環境変数未設定（ローカル開発時など）の場合は保存をスキップする（診断自体は失敗させない）。

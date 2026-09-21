@@ -18,7 +18,15 @@ async function getGoogleAccessToken(clientEmail: string, privateKey: string, sco
   const pemHeader = '-----BEGIN PRIVATE KEY-----';
   const pemFooter = '-----END PRIVATE KEY-----';
 
-  let pemContents = privateKey.trim();
+  // 項目5: k-uchiumi/Vercel の route.ts 側で呼び出し元が行っていた前処理
+  // （前後の "" を外す・文字列の \n を実改行に戻す）が移植されていなかったため追加。
+  let key = privateKey;
+  if (key.startsWith('"') && key.endsWith('"')) {
+    key = key.substring(1, key.length - 1);
+  }
+  key = key.replace(/\\n/g, '\n');
+
+  let pemContents = key.trim();
   if (pemContents.startsWith(pemHeader)) {
     pemContents = pemContents.substring(pemHeader.length);
   }

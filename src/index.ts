@@ -1,5 +1,6 @@
 import type { Env } from './env';
 import type { ProgressRecord } from './workflow';
+import { TOTAL_STEPS, PROGRESS_TTL_SECONDS } from './workflow';
 import { buildPublicView } from './display';
 
 export { CheckWorkflow } from './workflow';
@@ -72,6 +73,21 @@ export default {
       }
 
       const diagnosisId = crypto.randomUUID();
+
+      // 項目1-a: Workflow起動前に初期の進捗レコードを書いておく。Workflow側の初回書き込みを
+      // 待たずに画面が /api/diagnose/:id/public を叩いても404にならないようにするため。
+      const initialProgress: ProgressRecord = {
+        status: 'running',
+        diagnosisId,
+        targetUrl: normalized,
+        total: TOTAL_STEPS,
+        done: 0,
+        startedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await env.CHECK_PROGRESS.put(`diag:${diagnosisId}`, JSON.stringify(initialProgress), {
+        expirationTtl: PROGRESS_TTL_SECONDS,
+      });
 
       await env.CHECK_WORKFLOW.create({
         id: diagnosisId,

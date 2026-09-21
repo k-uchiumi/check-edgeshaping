@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>あなたのサイトにAIは届いてますか？ | check.edgeshap.ing</title>
+<style>
+  :root {
+    --fg: #1a1a1a;
+    --muted: #6b6b6b;
+    --border: #e2e2e2;
+    --bg: #ffffff;
+    --accent: #2563eb;
+    --ok: #16803c;
+    --ng: #b3261e;
+    --panel: #f7f7f8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fg: #f0f0f0;
+      --muted: #a0a0a0;
+      --border: #3a3a3a;
+      --bg: #16171a;
+      --accent: #6ea8fe;
+      --ok: #4ade80;
+      --ng: #f87171;
+      --panel: #1f2023;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    line-height: 1.7;
+  }
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+  }
+  h1 {
+    font-size: 1.5rem;
+    margin-bottom: 8px;
+  }
+  p.lead {
+    color: var(--muted);
+    margin-top: 0;
+  }
+  form {
+    display: flex;
+    gap: 8px;
+    margin: 24px 0;
+  }
+  input[type="text"] {
+    flex: 1;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 1rem;
+  }
+  button {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+  button:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  #status {
+    margin: 24px 0;
+    color: var(--muted);
+  }
+  #progressBarOuter {
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--panel);
+    overflow: hidden;
+    margin-top: 8px;
+  }
+  #progressBarInner {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+  ul#resultList {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  ul#resultList li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  ul#resultList li:last-child { border-bottom: none; }
+  .bot-name { font-size: 0.95rem; }
+  .robots-note { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+  .badge {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  .badge.ok { color: var(--ok); background: color-mix(in srgb, var(--ok) 15%, transparent); }
+  .badge.ng { color: var(--ng); background: color-mix(in srgb, var(--ng) 15%, transparent); }
+  #cta {
+    display: none;
+    margin-top: 28px;
+    padding: 20px;
+    border-radius: 10px;
+    background: var(--panel);
+  }
+  #cta p { margin-top: 0; }
+  #cta a {
+    display: inline-block;
+    padding: 10px 18px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 8px;
+    text-decoration: none;
+  }
+  #errorBox {
+    display: none;
+    margin: 16px 0;
+    padding: 14px 16px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--ng) 12%, transparent);
+    color: var(--ng);
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>あなたのサイトにAIは届いてますか？</h1>
+  <p class="lead">
+    URLを入力すると、代表的なAIボットのUAで実際にアクセスし、届いているかどうかを診断します。
+    診断には1分程度かかります。
+  </p>
+
+  <form id="diagForm">
+    <input type="text" id="urlInput" placeholder="https://example.com" autocomplete="off" required />
+    <button type="submit" id="submitBtn">診断する</button>
+  </form>
+
+  <div id="errorBox"></div>
+
+  <div id="status" style="display:none;">
+    <span id="statusText">診断中…</span>
+    <div id="progressBarOuter"><div id="progressBarInner"></div></div>
+  </div>
+
+  <ul id="resultList" style="display:none;"></ul>
+
+  <div id="cta">
+    <p>届いていないAIボットがあります。設定の見直しについては、お気軽にお問い合わせください。</p>
+    <a href="https://mareinterno.com/inquiry/" id="ctaLink" target="_blank" rel="noopener">お問い合わせはこちら</a>
+  </div>
+</main>
+
+<script>
+(function () {
+  const form = document.getElementById('diagForm');
+  const urlInput = document.getElementById('urlInput');
+  const submitBtn = document.getElementById('submitBtn');
+  const statusBox = document.getElementById('status');
+  const statusText = document.getElementById('statusText');
+  const progressBarInner = document.getElementById('progressBarInner');
+  const resultList = document.getElementById('resultList');
+  const cta = document.getElementById('cta');
+  const ctaLink = document.getElementById('ctaLink');
+  const errorBox = document.getElementById('errorBox');
+
+  let pollTimer = null;
+
+  function resetView() {
+    statusBox.style.display = 'none';
+    resultList.style.display = 'none';
+    resultList.innerHTML = '';
+    cta.style.display = 'none';
+    errorBox.style.display = 'none';
+    errorBox.textContent = '';
+    progressBarInner.style.width = '0%';
+  }
+
+  function showError(message) {
+    errorBox.textContent = message;
+    errorBox.style.display = 'block';
+    statusBox.style.display = 'none';
+  }
+
+  function renderResults(view) {
+    statusBox.style.display = 'none';
+    resultList.style.display = 'block';
+    resultList.innerHTML = '';
+
+    (view.bots || []).forEach(function (bot) {
+      const li = document.createElement('li');
+
+      const left = document.createElement('div');
+      const name = document.createElement('div');
+      name.className = 'bot-name';
+      name.textContent = bot.name;
+      left.appendChild(name);
+      if (bot.robotsDisallowed) {
+        const note = document.createElement('div');
+        note.className = 'robots-note';
+        note.textContent = '（robots.txtで拒否設定あり）';
+        left.appendChild(note);
+      }
+
+      const badge = document.createElement('span');
+      badge.className = 'badge ' + (bot.reached ? 'ok' : 'ng');
+      badge.textContent = bot.reached ? '届いている' : '届いていない';
+
+      li.appendChild(left);
+      li.appendChild(badge);
+      resultList.appendChild(li);
+    });
+
+    if (view.hasAnyBlocked) {
+      cta.style.display = 'block';
+      // 診断IDをクエリパラメータで渡す（問い合わせ受付時に担当者がSheets上のデータと突き合わせるため）
+      var inquiryUrl = 'https://mareinterno.com/inquiry/';
+      if (view.diagnosisId) {
+        inquiryUrl += '?diag=' + encodeURIComponent(view.diagnosisId);
+      }
+      ctaLink.href = inquiryUrl;
+    }
+    submitBtn.disabled = false;
+  }
+
+  function poll(diagnosisId) {
+    fetch('/api/diagnose/' + diagnosisId + '/public')
+      .then(function (res) {
+        if (!res.ok) throw new Error('取得に失敗しました');
+        return res.json();
+      })
+      .then(function (view) {
+        if (view.status === 'running') {
+          statusBox.style.display = 'block';
+          const done = view.progress ? view.progress.done : 0;
+          const total = view.progress ? view.progress.total : 0;
+          statusText.textContent = '診断中… (' + done + ' / ' + total + ')';
+          progressBarInner.style.width = (total ? Math.round((done / total) * 100) : 0) + '%';
+          pollTimer = setTimeout(function () { poll(diagnosisId); }, 2000);
+          return;
+        }
+        if (view.status === 'site_not_found') {
+          showError(view.message || 'URLが存在しない、またはサイトが応答しません');
+          submitBtn.disabled = false;
+          return;
+        }
+        if (view.status === 'error') {
+          showError(view.message || '診断中にエラーが発生しました');
+          submitBtn.disabled = false;
+          return;
+        }
+        if (view.status === 'complete') {
+          renderResults(view);
+          return;
+        }
+      })
+      .catch(function () {
+        showError('診断状況の取得に失敗しました。時間をおいて再度お試しください。');
+        submitBtn.disabled = false;
+      });
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (pollTimer) clearTimeout(pollTimer);
+    resetView();
+    submitBtn.disabled = true;
+    statusBox.style.display = 'block';
+    statusText.textContent = '診断を開始しています…';
+
+    fetch('/api/diagnose', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: urlInput.value.trim() }),
+    })
+      .then(function (res) {
+        if (!res.ok) {
+          return res.json().then(function (data) {
+            throw new Error(data.message || '診断を開始できませんでした');
+          });
+        }
+        return res.json();
+      })
+      .then(function (data) {
+        poll(data.diagnosisId);
+      })
+      .catch(function (err) {
+        showError(err.message || '診断は1回のみです');
+        submitBtn.disabled = false;
+      });
+  });
+})();
+</script>
+</body>
+</html>

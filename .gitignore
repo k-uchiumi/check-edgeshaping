@@ -3,4 +3,4 @@ dist/
 .wrangler/
 *.log
 .DS_Store
-dist-check/
+dist-check*/

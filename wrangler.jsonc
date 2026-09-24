@@ -6,6 +6,13 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
+	// 1回の診断で発生する累積サブリクエスト数（プローブfetch・DNS解決・KV進捗書き込み・
+	// robots.txt取得・Sheets保存を合わせると140件超）がアカウントのデフォルト上限に達し
+	// "Too many subrequests by single Worker invocation" で失敗したため明示的に引き上げ
+	// （2026-09-24、save-to-sheetsステップでの失敗を受けて対応）。
+	"limits": {
+		"subrequests": 1000
+	},
 	"assets": {
 		"directory": "./public/",
 		"binding": "ASSETS",

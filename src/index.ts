@@ -99,12 +99,12 @@ export default {
         // レコードがTTL満了等で既に無い場合は、通常どおり新規診断に進む
       }
 
-      // 項目1-a: セッション単位の上限（5回）。理由を説明せず「診断は5回までです」で拒否する。
+      // 項目1-a: セッション単位の上限（5回）。理由を説明せず「診断可能回数を超えました」で拒否する。
       const usedRaw = await env.CHECK_PROGRESS.get(`session-used:${sessionId}`);
       const usedCount = usedRaw ? parseInt(usedRaw, 10) || 0 : 0;
       if (usedCount >= SESSION_LIMIT) {
         return json(
-          { message: '診断は5回までです' },
+          { message: '診断可能回数を超えました' },
           429,
           setCookieHeader ? { 'Set-Cookie': setCookieHeader } : undefined
         );

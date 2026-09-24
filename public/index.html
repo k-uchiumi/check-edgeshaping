@@ -342,7 +342,7 @@
         poll(data.diagnosisId);
       })
       .catch(function (err) {
-        showError(err.message || '診断は1回のみです');
+        showError(err.message || '診断可能回数を超えました');
         submitBtn.disabled = false;
       });
   });

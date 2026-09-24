@@ -26,6 +26,14 @@ async function getGoogleAccessToken(clientEmail: string, privateKey: string, sco
   }
   key = key.replace(/\\n/g, '\n');
 
+  // OAuthの「invalid_grant: account not found」対策: clientEmail（issクレーム）も
+  // secret登録時に前後の "" や空白・改行が付くことがあるため、秘密鍵と同様に前処理する。
+  let issuer = clientEmail.trim();
+  if (issuer.startsWith('"') && issuer.endsWith('"')) {
+    issuer = issuer.substring(1, issuer.length - 1);
+  }
+  issuer = issuer.trim();
+
   let pemContents = key.trim();
   if (pemContents.startsWith(pemHeader)) {
     pemContents = pemContents.substring(pemHeader.length);
@@ -52,7 +60,7 @@ async function getGoogleAccessToken(clientEmail: string, privateKey: string, sco
   const header = { alg: 'RS256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
   const payload = {
-    iss: clientEmail,
+    iss: issuer,
     scope,
     aud: 'https://oauth2.googleapis.com/token',
     exp: now + 3600,

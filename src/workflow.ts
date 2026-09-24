@@ -41,7 +41,7 @@ export interface ProgressRecord {
 }
 
 export const TOTAL_STEPS = 1 + BOT_DICTIONARY.length + 1; // 70
-export const PROGRESS_TTL_SECONDS = 60 * 60 * 6; // 6時間で失効（問い合わせ添付用の永続化は実装順序5でSheetsへ）
+export const PROGRESS_TTL_SECONDS = 60 * 60 * 24; // 24時間で失効（項目1-c、2026-09-24。同一ドメイン24時間キャッシュ表示のため6時間から延長。問い合わせ添付用の永続化は実装順序5でSheetsへ）
 
 async function writeProgress(env: Env, record: ProgressRecord) {
   await env.CHECK_PROGRESS.put(`diag:${record.diagnosisId}`, JSON.stringify(record), {

@@ -145,6 +145,15 @@
     background: color-mix(in srgb, var(--ng) 12%, transparent);
     color: var(--ng);
   }
+  #previousResultBanner {
+    display: none;
+    margin: 16px 0;
+    padding: 12px 16px;
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
 </style>
 </head>
 <body>
@@ -161,6 +170,8 @@
   </form>
 
   <div id="errorBox"></div>
+
+  <div id="previousResultBanner"></div>
 
   <div id="status" style="display:none;">
     <span id="statusText">診断中…</span>
@@ -187,6 +198,7 @@
   const cta = document.getElementById('cta');
   const ctaLink = document.getElementById('ctaLink');
   const errorBox = document.getElementById('errorBox');
+  const previousResultBanner = document.getElementById('previousResultBanner');
 
   let pollTimer = null;
 
@@ -197,6 +209,8 @@
     cta.style.display = 'none';
     errorBox.style.display = 'none';
     errorBox.textContent = '';
+    previousResultBanner.style.display = 'none';
+    previousResultBanner.textContent = '';
     progressBarInner.style.width = '0%';
   }
 
@@ -320,6 +334,11 @@
         return res.json();
       })
       .then(function (data) {
+        // 項目1-b: 同一ドメインの24時間以内キャッシュ命中時は、前回の診断結果である旨を表示する
+        if (data.reused) {
+          previousResultBanner.textContent = '前回の診断結果（' + data.previousResultAt + '）';
+          previousResultBanner.style.display = 'block';
+        }
         poll(data.diagnosisId);
       })
       .catch(function (err) {
